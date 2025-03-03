@@ -1,12 +1,37 @@
-import 'package:attendance_management/core/utils/managescreen_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:attendance_management/presentation/blocs/attendance_bloc.dart';
 import 'package:attendance_management/presentation/blocs/attandance_state.dart';
+import 'package:attendance_management/presentation/blocs/attandance_event.dart';
 import 'package:attendance_management/presentation/screens/add_employee.dart';
 
-class ManageScreen extends StatelessWidget {
+class ManageScreen extends StatefulWidget {
   const ManageScreen({super.key});
+
+  @override
+  _ManageScreenState createState() => _ManageScreenState();
+}
+
+class _ManageScreenState extends State<ManageScreen> {
+  Set<String> _removedEmployees = {}; // Stores removed employees
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRemovedEmployees();
+  }
+
+  /// Loads removed employees from SharedPreferences
+  Future<void> _loadRemovedEmployees() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    List<String>? removedList = prefs.getStringList("removedEmployees");
+    if (removedList != null) {
+      setState(() {
+        _removedEmployees = removedList.toSet();
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -14,23 +39,23 @@ class ManageScreen extends StatelessWidget {
       body: BlocBuilder<AttendanceBloc, AttendanceState>(
         builder: (context, state) {
           if (state is AttendanceLoading) {
-            return Center(child: CircularProgressIndicator());
+            return const Center(child: CircularProgressIndicator());
           } else if (state is AttendanceLoaded) {
             final employeeNames = state.attendanceList
                 .map((e) => e.employeeName)
-                .toSet()
-                .skip(1) // Ensure this logic is correct
+                .toSet().skip(1)
+                .where((name) => !_removedEmployees.contains(name)) // Exclude removed employees
                 .toList();
 
             if (employeeNames.isEmpty) {
-              return Center(child: Text("No employees available."));
+              return const Center(child: CircularProgressIndicator());
             }
 
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Padding(
-                  padding: const EdgeInsets.all(20),
+                const Padding(
+                  padding: EdgeInsets.all(20),
                   child: Text("Employees List", style: TextStyle(fontSize: 20)),
                 ),
                 Expanded(
@@ -41,8 +66,8 @@ class ManageScreen extends StatelessWidget {
                         leading: CircleAvatar(child: Text(employeeNames[index][0])),
                         title: Text(employeeNames[index]),
                         trailing: IconButton(
-                          icon: Icon(Icons.more_vert),
-                          onPressed: () => showDeleteConfirmation(context,);
+                          icon: const Icon(Icons.more_vert),
+                          onPressed: () => _showDeleteConfirmation(context, employeeNames[index]),
                         ),
                       );
                     },
@@ -53,41 +78,52 @@ class ManageScreen extends StatelessWidget {
           } else if (state is AttendanceError) {
             return Center(child: Text("Error: ${state.message}"));
           }
-          return Center(child: Text("No data available."));
+          return const Center(child: CircularProgressIndicator());
         },
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => AddEmployee()),
+            MaterialPageRoute(builder: (context) => const AddEmployee()),
           );
         },
         tooltip: "Add New Employee Data",
-        child: Icon(Icons.add),
+        child: const Icon(Icons.add),
       ),
     );
   }
 
-  static void showDeleteConfirmation(BuildContext context, int rowIndex) {
+  /// Shows confirmation dialog for removing an employee
+  void _showDeleteConfirmation(BuildContext context, String employeeName) {
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text("Confirm Deletion"),
-          content: Text("Are you sure you want to delete this employee?"),
+          title: const Text("Remove Employee"),
+          content: Text("Are you sure you want to remove $employeeName permanently?"),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: Text("Cancel")),
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
             TextButton(
-              onPressed: () {
-
+              onPressed: () async {
+                context.read<AttendanceBloc>().add(RemoveEmployeeEvent(employeeName)); // Remove via BLoC
+                setState(() {
+                  _removedEmployees.add(employeeName);
+                });
+                await _saveRemovedEmployees(); // Persist changes
                 Navigator.pop(context);
               },
-              child: Text("Delete", style: TextStyle(color: Colors.red)),
+              child: const Text("Remove", style: TextStyle(color: Colors.red)),
             ),
           ],
         );
       },
     );
+  }
+
+  /// Saves removed employees to SharedPreferences
+  Future<void> _saveRemovedEmployees() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList("removedEmployees", _removedEmployees.toList());
   }
 }

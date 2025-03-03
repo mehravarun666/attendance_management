@@ -9,8 +9,9 @@ class AttendanceLoaded extends AttendanceState {
   final List<Attendance> attendanceList;
   final List<Attendance> filteredAttendance;
   final String? selectedDate;
+  final Set<String> removedEmployees;
 
-  AttendanceLoaded(this.attendanceList, this.filteredAttendance, this.selectedDate);
+  AttendanceLoaded(this.attendanceList, this.filteredAttendance, this.selectedDate,this.removedEmployees);
 }
 
 class AttendanceUpdated extends AttendanceState {}
