@@ -6,7 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'presentation/screens/home_screen.dart';
 
 void main() {
-  final sheetsService = GoogleSheetsService('1M--jEfeWfajmHchVMVPlB8IZwqQ91DdKwuSJaym5fGI');
+  final sheetsService = GoogleSheetsService('Google Sheet Id');
 
   runApp(
     BlocProvider(
